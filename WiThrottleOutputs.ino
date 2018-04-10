@@ -8,6 +8,7 @@
  *              loadAccessories() ==> loadOutputs()
  *              accessoryToggle() ==> outputToggle()
  * 
+ * Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
  * DCC++ https://github.com/DccPlusPlus v1.02b
  * DCC++ https://github.com/DccPlusPlus
  * ESP8266 Core https://github.com/esp8266/Arduino
