@@ -3,7 +3,7 @@
  * Software version 0.01
  * 
  * Marklin Z 1700mm x 600 layout, four engines with decoders, 12v track power
- * Wemos Mega+ESP8266, Motor Sheild, GPIO's connected to Darlington arrays (ULN)
+ * Wemos Mega+ESP8266, Motor Shield, GPIO's connected to Darlington arrays (ULN)
  * DCC++ SW adapted for only 20ms GPIO HIGH time.  Throw and Close signals use one GPIO each per turnout.
  * 
  * Change log:
