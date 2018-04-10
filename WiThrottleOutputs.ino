@@ -2,14 +2,18 @@
  * Truncated JMRI WiThrottle server implementation for DCC++ command station: GPIO Outputs instead of encoded accessory signals
  * Software version 0.01
  * 
+ * Marklin Z 1700mm x 600 layout, four engines with decoders, 12v track power
+ * Arduino Mega, ESP8266, GPIO's connected to Darlington arrays (ULN)
+ * 
  * 
  * Change log:
- * 2018-04-15 - Adapted for Outputs-only, used with a Marklin Z set
+ * 2018-04-9  - Cloned vhar/withrottle v1.02b
+ * 2018-04-11 - Adapted for GPIO Outputs-only, used with a  Marklin Z set, no accessory encoding
  *              loadAccessories() ==> loadOutputs()
  *              accessoryToggle() ==> outputToggle()
  * 
  * Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
- * DCC++ https://github.com/DccPlusPlus v1.02b
+ * JMRI WiThrottle DCC++ ESP8266 https://github.com/vhar/withrottle v1.02b
  * DCC++ https://github.com/DccPlusPlus
  * ESP8266 Core https://github.com/esp8266/Arduino
  * JMRI WiFi Throttle Communications Protocol http://jmri.sourceforge.net/help/en/package/jmri/jmrit/withrottle/Protocol.shtml
