@@ -1,12 +1,13 @@
 WiThrottleOutlets
-DCC++ Mega+ESP8266 to WiThrottle communication
+
+DCC++ Wemos Mega+ESP8266 to WiThrottle communication
 
 Truncated JMRI WiThrottle server implementation for DCC++ command station: GPIO Outputs instead of encoded accessory signals
 
 SYSTEM:
  * Marklin Z 1700mm x 600 layout, four engines with decoders, 12v track power
  * Wemos Mega+ESP8266, Motor Shield, GPIO's connected to Darlington arrays (ULN2803 x3)
- * DCC++ sketch adapted for only 20ms GPIO HIGH time.  Throw and Close signals use one GPIO each per turnout.
+ * DCC++ sketch adapted for only 20ms GPIO HIGH time.  Throw and Close commands use one GPIO each per turnout.
 
 REFERENCES:
  * Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
