@@ -1,17 +1,14 @@
 /*
- * Truncated JMRI WiThrottle server implementation for DCC++ command station
- * Software version 1.02b
- * Copyright (c) 2016-2017, Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
+ * Truncated JMRI WiThrottle server implementation for DCC++ command station: GPIO Outputs instead of encoded accessory signals
+ * Software version 0.01
+ * 
  * 
  * Change log:
- * 2017-09-10 - Fixed release responce for WiThrottle.app
- *              Fixed synchronize power status on clients
- * 2017-09-24 - Added mDNS responder
- *              Added start delay to fix connection problem with DCC++
  * 2018-04-15 - Adapted for Outputs-only, used with a Marklin Z set
  *              loadAccessories() ==> loadOutputs()
  *              accessoryToggle() ==> outputToggle()
  * 
+ * DCC++ https://github.com/DccPlusPlus v1.02b
  * DCC++ https://github.com/DccPlusPlus
  * ESP8266 Core https://github.com/esp8266/Arduino
  * JMRI WiFi Throttle Communications Protocol http://jmri.sourceforge.net/help/en/package/jmri/jmrit/withrottle/Protocol.shtml
