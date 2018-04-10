@@ -8,7 +8,7 @@ SYSTEM:
  * Marklin Z 1700mm x 600 layout, four engines with decoders, 12v track power
  * Wemos Mega+ESP8266, Motor Shield, GPIO's connected to Darlington arrays (ULN2803 x3)
  * DCC++ sketch forked for only 20ms GPIO HIGH time.  Throw and Close commands use one GPIO each per turnout.
- * WiThrottle sketch forked for use of GPIO Outlets for acceessory control instaeded of signal encoding
+ * WiThrottle sketch forked for use of GPIO Outlets for accessory control instaeded of signal encoding
 
 REFERENCES:
  * Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
