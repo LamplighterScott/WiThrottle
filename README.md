@@ -7,8 +7,8 @@ Truncated JMRI WiThrottle server implementation for DCC++ command station: GPIO 
 SYSTEM:
  * Marklin Z 1700mm x 600mm layout, four engines with DigiTrax DZ126T decoders, 12v track power
  * Wemos Mega+ESP8266, Motor Shield, GPIO's connected to Darlington arrays (ULN2803 x3)
- * DCC++ sketch forked for only 20ms GPIO HIGH time.  Throw and Close commands use one GPIO each per turnout.
- * WiThrottle sketch forked for use of GPIO Outlets for accessory control instead of signal encoding
+ * DCC++ sketch forked for momentary (20ms) GPIO HIGH signal time.  Throw and Close commands use one GPIO each per turnout, starting with GPIO #22.  The default pin numbers in the sketch are set to even-numbered GPIO's for the Close signals.  The sketch automatically selects the succeeding odd-numbered GPIO for the Throw signal.
+ * WiThrottle sketch forked for use of GPIO Outlets for accessory control instead of signal encoding.
 
 REFERENCES:
  * Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
