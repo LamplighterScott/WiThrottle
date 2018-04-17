@@ -1,4 +1,4 @@
-/*
+  /*
  * Truncated JMRI WiThrottle server implementation for DCC++ command station: GPIO Outputs instead of encoded accessory signals
  * Software version 0.02 untested
  * 
@@ -57,28 +57,29 @@
 typedef struct {  
   int id;  // system id number w/o system and type chars
   int pin;  // Arduino GPIO number
-  String *userName;  // any string for name of output
-  String *type;  // T = turnout, C = decoupler, F = semaphore
+  const char *userName;  // any string for name of output
+  const char *type;  // T = turnout, C = decoupler, F = semaphore
   int iFlag;  // See DCC++ Outlets for bits explanation
   int status;  // 0 = unknown, 2 = closed, 4 = thrown 
-  int present;  // Exists in DCC++ data file or not: 0 = no, 1 = yes
+  int present;  // Exists in DCC++ data file or not: 0 = no, 1 = yes; automatically checked and populated at start-up; leave as 0
 } tData;
-// tData tt[512];
-// Add or change default output user names, id#'s, GPIO#'s, etc., as necessary
-tData tt[]= 
-{1, 22, "To outer", "T", 0, 0},
-{2, 24, "To inner", "T", 0, 0},
-{3, 26, "Yard 1", "T", 0, 0},
-{4, 28, "Yard 1-1", "T", 0, 0},
-{5, 30, "Outer to Yard 2", "T", 0, 0},
-{6, 32, "Inner Cross to Yard 2", "T", 0, 0},
-{7, 34, "Yard 2-2", "T", 0, 0},
-{8, 36, "Sidetrack", "T", 0, 0},
-{17, 38, "Decoupler 1A", "C", 0, 0},
-{18, 40, "Decoupler 1B", "C", 0, 0},
-{19, 42, "Decoupler 2A", "C", 0, 0},
-{20, 44, "Decoupler 2B", "C", 0, 0},
-{25, 46, "Semaphore", "F", 0, 0};
+tData tt[]= {
+  {1, 22, "To outer", "T", 0, 0, 0},
+  {2, 24, "To inner", "T", 0, 0, 0},
+  {3, 26, "Yard 1", "T", 0, 0, 0},
+  {4, 28, "Yard 1-1", "T", 0, 0, 0},
+  {5, 30, "Outer to Yard 2", "T", 0, 0, 0},
+  {6, 32, "Inner Cross to Yard 2", "T", 0, 0, 0},
+  {7, 34, "Yard 2-2", "T", 0, 0, 0},
+  {8, 36, "Sidetrack", "T", 0, 0, 0},
+  {17, 38, "Decoupler 1A", "C", 0, 0, 0},
+  {18, 40, "Decoupler 1B", "C", 0, 0, 0},
+  {19, 42, "Decoupler 2A", "C", 0, 0, 0},
+  {20, 44, "Decoupler 2B", "C", 0, 0, 0},
+  {25, 46, "Semaphore", "F", 0, 0, 0},
+  {0, 0, "", "", 0, 0, 0}
+  };
+const int totalOutputs = 13;
 
 /* The interval of check connections between ESP & WiThrottle app */
 const int heartbeatTimeout = 10;
@@ -117,6 +118,8 @@ void setup() {
     turnPowerOn();
   else
     turnPowerOff();
+    
+  
 }
 
 void loop() {
@@ -158,9 +161,9 @@ void loop() {
         else if (clientData.startsWith("PTA")){
           // "PTA"+status(single digit int)+system(single char)+type(single char)+id(int)
           // ie "PTA1DT12"
-          String aStatus = clientData.substr(3,1);
-          int aAddr = clientData.substring(6).toInt();
-          outputToggle(aAddr, aStatus);
+          String aStatus = clientData.substring(3,4);
+          int aID = clientData.substring(6).toInt();
+          outputToggle(aID, aStatus);
         }
         else if (clientData.startsWith("N") || clientData.startsWith("*")){
           client[i].println("*" + String(heartbeatTimeout));
@@ -298,10 +301,13 @@ void loadOutputs() { // Accessories/Outputs
       if(s=="1") z=4;  //  Thrown
 
       // Find output from DCC++ output table created by loadOutputs()
-      for (t = 0 ; tt[t].id!=0 && tt[t].id!=id; t++)
-      tt[t].present = 1;
-      // tt[t].iFlag = iFlag;
-      tt[t].status = z;
+      int t = 0;
+      for (t = 0 ; t<totalOutputs && tt[t].id!=id; t++);
+      if (tt[t].id!=0) {
+        tt[t].present = 1;
+        // tt[t].iFlag = iFlag;
+        tt[t].status = z;
+      }
 
       // tt[t]={id, i, z};  // id, iFlag, status
       // t++;
@@ -311,13 +317,17 @@ void loadOutputs() { // Accessories/Outputs
   }
 
   // Upload missing Outputs to DCC++
-  // for (t=0; tt[t].id!=0; t++) {
-  for (t=0; t<sizeOf(tt); t++) {
-    if (tt[t].present<1) {
+  int t=0;
+  for (t=0; t<totalOutputs; t++) {
+    if (tt[t].present<1 && tt[t].id!=0) {
       Serial.print("<Z "+String(tt[t].id)+" "+String(tt[t].pin)+" "+String(tt[t].iFlag)+">");
       String response = loadResponse();
+      
     }
   }
+  // Have DCC++ save settings
+  Serial.print("<E>");
+  String response = loadResponse();
 
 }
 
@@ -330,11 +340,13 @@ void throttleStart(int i) {
   client[i].println("PPA"+powerStatus);
   client[i].println("PTT]\\[Turnouts}|{Turnout]\\[Closed}|{2]\\[Thrown}|{4");
   client[i].print("PTL");
-  for (int t = 0 ; tt[t].address != 0; t++) {
-    //  System Name, User Name, Status
-    // System Name = "D" + type(single char: T, C or F) + id number
-    client[i].print("]\\[D"+tt[t].type+String(tt[t].id)+"}|{"+tt[t].userName+"}|{"+tt[t].tStatus);
-  }
+    for (int t = 0 ; t<totalOutputs; t++) {
+      //  System Name, User Name, Status
+      // System Name = "D" + type(single char: T, C or F) + id number
+      if (tt[t].id!=0) {
+        client[i].print("]\\[D"+String(tt[t].type)+String(tt[t].id)+"}|{"+String(tt[t].userName)+"}|{"+tt[t].status);
+      }
+    }  
   client[i].println("");
   client[i].println("*"+String(heartbeatTimeout));
   alreadyConnected[i] = true;
@@ -481,36 +493,27 @@ void checkHeartbeat(int i) {
   }
 }
 
-void outputToggle(int id, String aStatus)
+void outputToggle(int aID, String aStatus){
 
   // Convert status to DCC++ format
   int newStat;
-  if(aStatus=="4") 
+  if(aStatus=="T") 
     newStat=1;
-  else if(aStatus=="2")
+  else if(aStatus=="C")
     newStat=0;
   else
     newStat=-1;
-  int t=0;
+  
 
   // Find output from output table
-  for (t = 0 ; tt[t].id!=0 && tt[t].id!=id ; t++);
+  int t=0;
+  for (t = 0 ; t<totalOutputs && tt[t].id!=aID ; t++);
 
-  if(tt[t].id==0 && newStat>-1){
-
-    // Create a new entry in DCC++ ????
-    // int addr=((aAddr-1)/4)+1;
-    // int sub=aAddr-addr*4+3;
-    // for(int i=0; i<maxClient; i++){
-      //client[i].println("PTA2LT"+String(aAddr));
-    //}
-    // Serial.print("<a "+String(addr)+" "+String(sub)+" "+String(newStat)+">");
-
-  } else {
+  if (tt[t].id!=0) {
 
     // If newStat not Thrown or Closed, flip Thrown/Closed state
     if(newStat<0){
-      switch(tt[t].tStatus){
+      switch(tt[t].status){
         case 2:
           tt[t].status=4;
           newStat=0;
@@ -535,13 +538,14 @@ void outputToggle(int id, String aStatus)
     }
 
     String ptaText = "PTA";
-    String accessoryText = "D"+tt[t].type;
+    String accessoryText = "D"+String(tt[t].type);
 
     for(int i=0; i<maxClient; i++){
-      client[i].println(ptaText+String(tt[t].tStatus)+accessoryText+String(tt[t].id));
+      client[i].println(ptaText+String(tt[t].status)+accessoryText+String(tt[t].id));
     }
     Serial.print("<Z "+String(tt[t].id)+" "+String(newStat)+">");
     String response = loadResponse();
 
   }
 }
+
