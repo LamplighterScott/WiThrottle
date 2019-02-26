@@ -18,10 +18,29 @@
  *              load roster in throttleSetup
  *              Still can't get the roster and functions to appear in WiThottle!!!
  *              
- * Uploading instructions:  Switch DIP 5 & 6 & 7 to ON
- *                          Select: Lolin (Wemos) d1 R2 & Mini in Arduino IDE App
- *                          Select upload speed: 115200
- *                          Select port as: whcubserial1410
+ * Uploading via WEMOS MEGA R3:   Switch DIP 5 & 6 & 7 to ON
+ *                                Select: Lolin (Wemos) d1 R2 & Mini in Arduino IDE App
+ *                                Select upload speed: 115200
+ *                                Select port as: whcubserial1410
+ *                          
+ * Uploading via USB programmer:  Ground GPIO0 during upload
+ *                                Board: Generic ESP8266 Module
+ *                                Upload Spead: 115200
+ *                                CPU Frequency: 80MHz
+ *                                Crystal Frequence: 26MHz
+ *                                Flash Size: 512k (no SPIFFS)
+ *                                Flash Mode: DOUT (Compatible)
+ *                                Flash Frequency: 40MHz
+ *                                Reset Menu: ck
+ *                                Debug Port: Disabled
+ *                                Debug Level: None
+ *                                IwIP Variant: v2 Lower Memory
+ *                                VTables: Flash
+ *                                Exceptions: Disabled
+ *                                Built-in LED: 2
+ *                                Erase Flash: Only Sketch
+ *                                Port: /dev/uc.wchusbserial1410
+ *  
  * 
  * Valerie Valley RR https://sites.google.com/site/valerievalleyrr/
  * JMRI WiThrottle DCC++ ESP8266 https://github.com/vhar/withrottle v1.02b
@@ -88,31 +107,17 @@ tData tt[]= {
   {19, 42, "Decoupler 2A", "C", 0, 0, 0},
   {20, 44, "Decoupler 2B", "C", 0, 0, 0},
   {25, 46, "Semaphore", "F", 0, 0, 0},
+  // {26, 48, "Semaphore", "F", 0, 0, 0},
   {0, 0, "", "", 0, 0, 0}
-  
-  };
+};
 const int totalOutputs = 13;
 
-/* Define Engine Roster object structures */
-typedef struct {  
-  const char *locoName;  // any string for name of engine
-  int address;  // engine address, short (two digits) or long
-  
-  // const char *addressLengthType;  // short address = S, long address = L, S hardcoded in throttleStart
-} rosterData;
-/* Formate {name, address, addressLengthType, FO, F1, F2, F3, F4} */
-rosterData roster[]= {
-  {"SB B 460", 46},
-  {"DB 111 Red", 3},
-  {"DB 023-9 Green", 3},
-  {"", 0}
-  
-  };
+const String roster = "RL3]\[SB B 460}|{46}|{S]\[DB 111 Red}|{3}|{S]\[DB 023-9 Green}|{3}|{S";
 const int numberOfLocomotives = 3;
 
-String functionTitles [][30] = {{"Lights", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
-                {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
-                {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""}};
+String functionTitles [3][30] = {{"Lights", "", "", "", "", "Sound Up", "Sound Down", "Horn", "Approach", "Steam", "Whistle", "Horn x2", "Horn Clear", "Horn Distance", "Crossing", "Air Horn 1", "Air Horn 2", "", "", "", "", "", "", "", "", "", "", "", "", ""},
+                {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt", "Sound Up", "Sound Down", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
+                {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt", "Sound Up", "Sound Down", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""}};
 // functionTitles[3] = { "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""};
 
 /* The interval of check connections between ESP & WiThrottle app */
@@ -141,7 +146,7 @@ void setup() {
   Serial.begin(115200);
   Serial.flush();
   
-  WiFi.mode(WIFI_AP_STA);
+  WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(WTServer_Ip, WTServer_Ip, WTServer_NMask);
   WiFi.softAP(ssid, password);
 
@@ -152,8 +157,7 @@ void setup() {
     turnPowerOn();
   else
     turnPowerOff();
-    
-  
+
 }
 
 void loop() {
@@ -182,7 +186,10 @@ void loop() {
       while(start < last){
         finish = Data.indexOf('\n', start+1);
         String clientData = Data.substring(start+1, finish);
-        //  Serial.println("Client data received: "+clientData);
+        
+        //////////////// REPORT DATA /////////////////
+          Serial.println("<H "+clientData+">");
+ 
         start = finish;
         if (clientData.startsWith("*+")) { // Heartbeat
           heartbeatEnable[i] = true;
@@ -218,12 +225,10 @@ void loop() {
         else if (clientData.startsWith("*")){
           client[i].println("*" + String(heartbeatTimeout));          
         }
-        else if (clientData.startsWith("MT") || clientData.startsWith("MS") || clientData.startsWith("M0") || clientData.startsWith("M1")) {
+        else if (clientData.startsWith("M")) {
+          
           String th = clientData.substring(1,2);
-          if (th == "T" || th == "0")
-            Throttle = 0+i*2;
-          else
-            Throttle = 1+i*2;
+          Throttle = i*2;
           String action = clientData.substring(2,3);
           String actionData = clientData.substring(3);
           int delimiter = actionData.indexOf(";");
@@ -241,21 +246,37 @@ void loop() {
               fKey=actionVal.substring(1).toInt();
               LocoState[Throttle][29]=fKey;
             }
-            else {
+            else if (actionVal.startsWith("F")) {  // Intercept sounds
+              /////////////////////// TESTING /////////////////////////////////////////
+              String functionVal = actionVal.substring(2);
+              String functionValAction = actionVal.substring(1);
+              int functionNumber = functionVal.toInt();
+              if (functionNumber<5){
+                  Serial.println("<J "+functionValAction+String(functionNumber)+">");
+              } else {
+                  Serial.println("<H NotLessThan5-"+clientData+">");
+                locoAction(th, actionKey, actionVal, i);
+              }
+            } else {  // all other functions to be encoded to locomotives
+              Serial.println("<H allFunctions-"+clientData+">");
               locoAction(th, actionKey, actionVal, i);
             }
           }
           heartbeat[Throttle]=millis();
+        }
+        else if (clientData.startsWith("R")) {
+        client[i].println(roster);
         }
       }
       for(Throttle=0+i*2;Throttle<2+i*2;Throttle++){
         if(changeSpeed[Throttle]!="" && LocoThrottle[Throttle]!=""){
           String locoAddress=LocoThrottle[Throttle].substring(1);
           fKey=LocoState[Throttle][29];
-          Serial.print("<t "+String(Throttle+1)+" "+locoAddress+"  "+String(fKey)+" "+String(LocoState[Throttle][30])+">");
+            Serial.println("<t "+String(Throttle+1)+" "+locoAddress+"  "+String(fKey)+" "+String(LocoState[Throttle][30])+">");
           String response = loadResponse();
         }
       }
+      
       if (heartbeatEnable[i]) {
         checkHeartbeat(i);
       }
@@ -263,12 +284,17 @@ void loop() {
   }
 }
 
+//////////////////////////////////////////////////////////////
+
 int invert(int value){
   if(value == 0)
     return 1;
   else
     return 0;
-}
+    
+}  // invert
+
+//////////////////////////////////////////////////////////////
 
 void turnPowerOn() {
   powerStatus = "1";
@@ -281,7 +307,9 @@ void turnPowerOn() {
   {
     c=Serial.read();
   }
-}
+}  // turnPowerOn()
+
+//////////////////////////////////////////////////////////////
 
 void turnPowerOff() {
   powerStatus = "0";
@@ -294,7 +322,9 @@ void turnPowerOff() {
   {
     c=Serial.read();
   }
-}
+}  // turnPowerOff()
+
+//////////////////////////////////////////////////////////////
 
 String loadResponse() {
   while (Serial.available() <= 0) {
@@ -310,7 +340,9 @@ String loadResponse() {
     else if(strlen(commandString)<maxCommandLength)
       sprintf(commandString,"%s%c",commandString,c);
   }
-}
+}  // loadResponse()
+
+//////////////////////////////////////////////////////////////
 
 void loadOutputs() { // Accessories/Outputs
   Serial.write("<Z>");  // Get the list of Outputs in DCC++ 
@@ -364,13 +396,14 @@ void loadOutputs() { // Accessories/Outputs
     }
     else if(strlen(commandString)<maxCommandLength)
       sprintf(commandString,"%s%c",commandString,c);
-  }
+      
+  }  //  end while
 
   // Upload missing Outputs to DCC++
   int t=0;
   for (t=0; t<totalOutputs; t++) {
     if (tt[t].present<1 && tt[t].id!=0) {
-      Serial.print("<Z "+String(tt[t].id)+" "+String(tt[t].pin)+" "+String(tt[t].iFlag)+">");
+      Serial.println("<Z "+String(tt[t].id)+" "+String(tt[t].pin)+" "+String(tt[t].iFlag)+">");
       String response = loadResponse();
       
     }
@@ -379,27 +412,18 @@ void loadOutputs() { // Accessories/Outputs
   Serial.print("<E>");
   String response = loadResponse();
 
-}
+}  //  loadOutputs()
 
 
+//////////////////////////////////////////////////////////////
 //  T H R O T T L E   S E T U P
 void throttleSetup(int i) {
-  // Serial.println("ThrottleSetup sent to throttle number: "+String(i));
+
   // VERSION
   client[i].println("VN2.0");
 
   // ROSTER
-  //client[i].println("RL0");
-  /*String rosterList = "RL"+String(numberOfLocomotives); // upload roster
-    for (int locomotive = 0; locomotive<numberOfLocomotives; locomotive++) {
-      //  Locomotive Name, Loconotive Address, Locomotive Address Length Type
-      if (roster[locomotive].address!=0) {
-        rosterList=rosterList+"]\["+String(roster[locomotive].locoName)+"}|{"+String(roster[locomotive].address)+"}|{S";
-      }
-    }
-    client[i].print(rosterList+"\n\n");*/
-
-    client[i].println("RL3]\[SB B 460}|{46}|{S]\[DB 111 Red}|{3}|{S]\[DB 023-9 Green}|{3}|{S");
+  client[i].println(roster);
 
   // POWER STATUS
   client[i].println("PPA"+powerStatus);
@@ -425,17 +449,20 @@ void throttleSetup(int i) {
   client[i].println("RCC0");
 
   // ???
-  // client[i].println("");
+  client[i].println("");
   // client[i].println("PFT1548365142<;>1.0");
     
   // JMRI WEB PORT
-  // client[i].println("");
+  client[i].println("");
+  // client[i].println("44444");
   //  What should be in here for EPS6288?  !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   // HEARTBEAT
   client[i].println("*"+String(heartbeatTimeout));
   
-}
+}  // throttleSet-up()
+
+//////////////////////////////////////////////////////////////
 
 void throttleStop(int i) {
   client[i].stop();
@@ -446,7 +473,10 @@ void throttleStop(int i) {
   heartbeat[0+i*2] = 0;
   LocoState[1+i*2][29] = 0;
   heartbeat[1+i*2] = 0;
-}
+  
+}  //  throttleStop()
+
+//////////////////////////////////////////////////////////////
 
 void locoAdd(String th, String actionKey, int i) {
   LocoThrottle[Throttle] = actionKey;
@@ -455,8 +485,11 @@ void locoAdd(String th, String actionKey, int i) {
   // Function button titles
   String funcTitles = "M"+th+"L"+actionKey+"<;>";
   for (int fT=0; fT<29; fT++) {
-            funcTitles = funcTitles+"]\["+functionTitles[Throttle][fT];
+      funcTitles=funcTitles+"]\["+functionTitles[Throttle][fT];
  
+  }
+  while(!Serial){
+    Serial.println("<HfunctionTitles-"+funcTitles+">");
   }
   client[i].println(funcTitles);
 
@@ -469,7 +502,10 @@ void locoAdd(String th, String actionKey, int i) {
   client[i].println("M"+th+"+"+actionKey+"<;>V0");
   client[i].println("M"+th+"+"+actionKey+"<;>R1");
   client[i].println("M"+th+"+"+actionKey+"<;>s1");
-}
+  
+}  // locoAdd()
+
+//////////////////////////////////////////////////////////////
 
 void locoRelease(String th, String actionKey, int i) {
   String locoAddress = LocoThrottle[Throttle].substring(1);
@@ -479,7 +515,9 @@ void locoRelease(String th, String actionKey, int i) {
   String response = loadResponse();
   client[i].println("M"+th+"-"+actionKey+"<;>");
 
-}
+}  // locoRelease
+
+//////////////////////////////////////////////////////////////
 
 void locoAction(String th, String actionKey, String actionVal, int i){
   String locoAddress = LocoThrottle[Throttle].substring(1);
@@ -572,7 +610,10 @@ void locoAction(String th, String actionKey, String actionVal, int i){
     Serial.print("<t "+String(Throttle+1)+" "+locoAddress+" 0 "+String(LocoState[Throttle][30])+">");
     response = loadResponse();
   }
-}
+  
+}  // locoAction()
+
+//////////////////////////////////////////////////////////////
 
 void checkHeartbeat(int i) {
   if(heartbeat[0+i*2] > 0 && heartbeat[0+i*2] + heartbeatTimeout * 1000 < millis()) {
@@ -585,7 +626,9 @@ void checkHeartbeat(int i) {
     heartbeat[1+i*2] = 0;
     client[i].println("MSA"+LocoThrottle[1+i*2]+"<;>"+"V0");
   }
-}
+}  // checkHeartbeat()
+
+//////////////////////////////////////////////////////////////
 
 void outputToggle(int aID, String aStatus){
 
@@ -641,4 +684,5 @@ void outputToggle(int aID, String aStatus){
     String response = loadResponse();
 
   }
-}
+  
+}  // outputToggle()
