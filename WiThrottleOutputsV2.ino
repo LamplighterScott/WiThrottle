@@ -112,13 +112,11 @@ tData tt[]= {
 };
 const int totalOutputs = 13;
 
-const String roster = "RL3]\[SB B 460}|{46}|{S]\[DB 111 Red}|{3}|{S]\[DB 023-9 Green}|{3}|{S";
+char roster[] = "RL3]\\[SB B 460}|{46}|{S]\\[DB 111 Red}|{3}|{S]\\[DB 023-9 Green}|{3}|{S"; // See setThrottle
 const int numberOfLocomotives = 3;
+char *functionTitles[3][5]={{"Lights", "", "", "", ""}, {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt"}, {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt"}};
+char *soundTitles[25]={"Sound Up", "Sound Down", "Horn", "Approach", "Steam", "Whistle", "Horn x2", "Horn Clear", "Horn Distant", "Crossing", "Air Horn 1", "Air Horn 2", "Church", "Clock", "Dixie Horn", "Fire Truck", "Foghorn", "Door Bell", "Freight Train", "HVAC", "Street", "Steam Train", "Dog", "Party", "Train Idle"};
 
-String functionTitles [3][30] = {{"Lights", "", "", "", "", "Sound Up", "Sound Down", "Horn", "Approach", "Steam", "Whistle", "Horn x2", "Horn Clear", "Horn Distance", "Crossing", "Air Horn 1", "Air Horn 2", "", "", "", "", "", "", "", "", "", "", "", "", ""},
-                {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt", "Sound Up", "Sound Down", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
-                {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt", "Sound Up", "Sound Down", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""}};
-// functionTitles[3] = { "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""};
 
 /* The interval of check connections between ESP & WiThrottle app */
 const int heartbeatTimeout = 10;
@@ -157,6 +155,7 @@ void setup() {
     turnPowerOn();
   else
     turnPowerOff();
+    
 
 }
 
@@ -187,8 +186,10 @@ void loop() {
         finish = Data.indexOf('\n', start+1);
         String clientData = Data.substring(start+1, finish);
         
-        //////////////// REPORT DATA /////////////////
-          Serial.println("<H "+clientData+">");
+        //////////////// REPORT DATA ////////////////
+        //  Serial.print("<H ");
+        //  Serial.print(clientData);
+        //  Serial.println(">");
  
         start = finish;
         if (clientData.startsWith("*+")) { // Heartbeat
@@ -247,18 +248,15 @@ void loop() {
               LocoState[Throttle][29]=fKey;
             }
             else if (actionVal.startsWith("F")) {  // Intercept sounds
-              /////////////////////// TESTING /////////////////////////////////////////
               String functionVal = actionVal.substring(2);
-              String functionValAction = actionVal.substring(1);
+              String functionValAction = actionVal.substring(1,2);
               int functionNumber = functionVal.toInt();
-              if (functionNumber<5){
-                  Serial.println("<J "+functionValAction+String(functionNumber)+">");
+              if (functionNumber>4){ // J sends the command to the DF Player Mini 
+                Serial.println("<J "+functionValAction+" "+functionVal+">");
               } else {
-                  Serial.println("<H NotLessThan5-"+clientData+">");
                 locoAction(th, actionKey, actionVal, i);
               }
             } else {  // all other functions to be encoded to locomotives
-              Serial.println("<H allFunctions-"+clientData+">");
               locoAction(th, actionKey, actionVal, i);
             }
           }
@@ -443,7 +441,7 @@ void throttleSetup(int i) {
     client[i].println(turnoutList); // upload turnouts
 
   // ROUTES
-  client[i].println("PRT]\[Routes}|{Route]\[Active}|{2]\[Inactive}|{4");
+  client[i].println("PRT]\\[Routes}|{Route]\\[Active}|{2]\\[Inactive}|{4");
 
   // CONSISTS
   client[i].println("RCC0");
@@ -483,16 +481,24 @@ void locoAdd(String th, String actionKey, int i) {
   client[i].println("M"+th+"+"+actionKey+"<;>");
 
   // Function button titles
-  String funcTitles = "M"+th+"L"+actionKey+"<;>";
+  String funcTitleHeader = "M"+th+"L"+actionKey+"<;>";
+  client[i].print(funcTitleHeader);
+  char delim[4] = "]\\[";
+  char printArray[17];
+  for (int fT=0; fT<5; fT++) {
+    strcpy(printArray, delim);
+    char *fTitle = functionTitles[Throttle][fT];
+    strcat(printArray, fTitle);
+    client[i].print(printArray);
+  }
   for (int fT=0; fT<29; fT++) {
-      funcTitles=funcTitles+"]\["+functionTitles[Throttle][fT];
+    strcpy(printArray, delim);
+    char *fTitle=soundTitles[fT];
+    strcat(printArray, fTitle);
+    client[i].print(printArray);
+  }
+  client[i].println("");
  
-  }
-  while(!Serial){
-    Serial.println("<HfunctionTitles-"+funcTitles+">");
-  }
-  client[i].println(funcTitles);
-
   // Function states
   String funtionHeader = "M"+th+"A"+actionKey+"<;>F0";
   for(fKey=0; fKey<29; fKey++){
