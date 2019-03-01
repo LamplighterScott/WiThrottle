@@ -4,7 +4,8 @@
  * 
  * Marklin Z 1700mm x 600 layout, four engines with decoders, 12v track power
  * Wemos Mega+ESP8266, Motor Shield, GPIO's connected to Darlington arrays (ULN2803 x3)
- * DCC++ SW adapted for momentary (20ms) GPIO HIGH signal.  Throw and Close signals use one GPIO each per turnout, starting with GPIO 22.  Sketch automatically selects even GPIO number for close signal and odd GPIO number for throw signal.
+ * DCC++ SW adapted for momentary (20ms) GPIO HIGH signal.  Throw and Close signals use one GPIO each per turnout, starting with GPIO 22.
+ * Sketch automatically selects even GPIO number for close signal and odd GPIO number for throw signal.
  * 
  * Change log:
  * 2018-04-9  - Cloned vhar/withrottle v1.02b
@@ -12,11 +13,12 @@
  *              loadAccessories() ==> loadOutputs()
  *              accessoryToggle() ==> outputToggle()
  *              throttleStart()
- * 2019-01-26   WiThrottleOutputsV2
+ * 2019-01-26 - WiThrottleOutputsV2
  *              Added locomotive roster and uploading to WiThrotte
  *              rosterData in defintions
  *              load roster in throttleSetup
- *              Still can't get the roster and functions to appear in WiThottle!!!
+ * 2019-02-28 - Converted some String calls to char, fixed the roster and function title loading.
+ *              Forgot to put \'s in front of the \'s in the delimiters!  Sounds files now playing correctly on DF Player Mini
  *              
  * Uploading via WEMOS MEGA R3:   Switch DIP 5 & 6 & 7 to ON
  *                                Select: Lolin (Wemos) d1 R2 & Mini in Arduino IDE App
@@ -92,7 +94,7 @@ typedef struct {
   int turnoutStatus;  // 0 = unknown, 2 = closed, 4 = thrown 
   int present;  // Exists in DCC++ data file or not: 0 = no, 1 = yes; automatically checked and populated at start-up; leave as 0
 } tData;
-/* Formate {Switch number, pin number, name, type, X, X, X} */
+/* Format {Switch number, pin number, name, type, X, X, X} */
 tData tt[]= {
   {1, 22, "To outer", "T", 0, 0, 0},
   {2, 24, "To inner", "T", 0, 0, 0},
@@ -114,11 +116,12 @@ const int totalOutputs = 13;
 
 char roster[] = "RL3]\\[SB B 460}|{46}|{S]\\[DB 111 Red}|{3}|{S]\\[DB 023-9 Green}|{3}|{S"; // See setThrottle
 const int numberOfLocomotives = 3;
+String locoAddresses[3]={"46","3","3"};
 char *functionTitles[3][5]={{"Lights", "", "", "", ""}, {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt"}, {"Lights", "Beam", "Cab 1 light", "Cab 2 light", "Shunt"}};
 char *soundTitles[25]={"Sound Up", "Sound Down", "Horn", "Approach", "Steam", "Whistle", "Horn x2", "Horn Clear", "Horn Distant", "Crossing", "Air Horn 1", "Air Horn 2", "Church", "Clock", "Dixie Horn", "Fire Truck", "Foghorn", "Door Bell", "Freight Train", "HVAC", "Street", "Steam Train", "Dog", "Party", "Train Idle"};
 
 
-/* The interval of check connections between ESP & WiThrottle app */
+/* The interval for checking connections between ESP & WiThrottle app */
 const int heartbeatTimeout = 10;
 boolean heartbeatEnable[maxClient]={true, true, true};
 unsigned long heartbeat[maxClient*2];
@@ -133,11 +136,14 @@ char commandString[maxCommandLength+1];
 boolean alreadyConnected[maxClient];
 String powerStatus;
 char msg[16];
-int status = WL_IDLE_STATUS;
 
 /* Define WiThrottle Server */
 WiFiServer server(WTServer_Port);
 WiFiClient client[maxClient];
+
+//////////////////////////////////////////////////////////////
+//  SET-UP  //////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void setup() {
   delay(1500);
@@ -156,8 +162,11 @@ void setup() {
   else
     turnPowerOff();
     
-
 }
+
+//////////////////////////////////////////////////////////////
+//  LOOP  ////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void loop() {
   for(int i=0; i<maxClient; i++){
@@ -283,6 +292,8 @@ void loop() {
 }
 
 //////////////////////////////////////////////////////////////
+//  INVERT  //////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 int invert(int value){
   if(value == 0)
@@ -292,6 +303,8 @@ int invert(int value){
     
 }  // invert
 
+//////////////////////////////////////////////////////////////
+//  TURN POWER ON  ///////////////////////////////////////////
 //////////////////////////////////////////////////////////////
 
 void turnPowerOn() {
@@ -308,6 +321,8 @@ void turnPowerOn() {
 }  // turnPowerOn()
 
 //////////////////////////////////////////////////////////////
+//  TURN POWER OFF  //////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void turnPowerOff() {
   powerStatus = "0";
@@ -322,6 +337,8 @@ void turnPowerOff() {
   }
 }  // turnPowerOff()
 
+//////////////////////////////////////////////////////////////
+// LOAD RESPONSE  ////////////////////////////////////////////
 //////////////////////////////////////////////////////////////
 
 String loadResponse() {
@@ -340,6 +357,8 @@ String loadResponse() {
   }
 }  // loadResponse()
 
+//////////////////////////////////////////////////////////////
+//  LOAD OUTPUTS  ////////////////////////////////////////////
 //////////////////////////////////////////////////////////////
 
 void loadOutputs() { // Accessories/Outputs
@@ -382,11 +401,12 @@ void loadOutputs() { // Accessories/Outputs
 
       // Find output from DCC++ output table created by loadOutputs()
       int t = 0;
-      for (t = 0 ; t<totalOutputs && tt[t].id!=id; t++);
-      if (tt[t].id!=0) {
-        tt[t].present = 1;
-        // tt[t].iFlag = iFlag;
-        tt[t].turnoutStatus = z;
+      for (t = 0 ; t<totalOutputs && tt[t].id!=id; t++) {;
+        if (tt[t].id!=0) {
+          tt[t].present = 1;
+          // tt[t].iFlag = iFlag;
+          tt[t].turnoutStatus = z;
+        }
       }
 
       // tt[t]={id, i, z};  // id, iFlag, turnoutStatus
@@ -414,7 +434,8 @@ void loadOutputs() { // Accessories/Outputs
 
 
 //////////////////////////////////////////////////////////////
-//  T H R O T T L E   S E T U P
+//  T H R O T T L E   S E T U P  /////////////////////////////
+//////////////////////////////////////////////////////////////
 void throttleSetup(int i) {
 
   // VERSION
@@ -444,7 +465,8 @@ void throttleSetup(int i) {
   client[i].println("PRT]\\[Routes}|{Route]\\[Active}|{2]\\[Inactive}|{4");
 
   // CONSISTS
-  client[i].println("RCC0");
+  // client[i].println("RCC0");
+  client[i].println("");
 
   // ???
   client[i].println("");
@@ -461,6 +483,8 @@ void throttleSetup(int i) {
 }  // throttleSet-up()
 
 //////////////////////////////////////////////////////////////
+//  THROTTLE STOP  ///////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void throttleStop(int i) {
   client[i].stop();
@@ -475,6 +499,8 @@ void throttleStop(int i) {
 }  //  throttleStop()
 
 //////////////////////////////////////////////////////////////
+//   LOCO ADD   //////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void locoAdd(String th, String actionKey, int i) {
   LocoThrottle[Throttle] = actionKey;
@@ -485,12 +511,26 @@ void locoAdd(String th, String actionKey, int i) {
   client[i].print(funcTitleHeader);
   char delim[4] = "]\\[";
   char printArray[17];
+
+  // Get roster number from loco address
+  int rosterNumber = 0;
+  String locoAddress = actionKey.substring(1);
+  for (int x=0; x<numberOfLocomotives; x++) {
+    if (locoAddresses[x] == locoAddress) {
+      rosterNumber=x;
+      break;
+    }
+  }
+
+  // Load loco functions
   for (int fT=0; fT<5; fT++) {
     strcpy(printArray, delim);
-    char *fTitle = functionTitles[Throttle][fT];
+    char *fTitle = functionTitles[rosterNumber][fT];
     strcat(printArray, fTitle);
     client[i].print(printArray);
   }
+
+  // Load sound file titles
   for (int fT=0; fT<29; fT++) {
     strcpy(printArray, delim);
     char *fTitle=soundTitles[fT];
@@ -512,6 +552,8 @@ void locoAdd(String th, String actionKey, int i) {
 }  // locoAdd()
 
 //////////////////////////////////////////////////////////////
+//  LOCO RELEASE  ////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void locoRelease(String th, String actionKey, int i) {
   String locoAddress = LocoThrottle[Throttle].substring(1);
@@ -523,6 +565,8 @@ void locoRelease(String th, String actionKey, int i) {
 
 }  // locoRelease
 
+//////////////////////////////////////////////////////////////
+//  LOCO ACTION  /////////////////////////////////////////////
 //////////////////////////////////////////////////////////////
 
 void locoAction(String th, String actionKey, String actionVal, int i){
@@ -620,6 +664,8 @@ void locoAction(String th, String actionKey, String actionVal, int i){
 }  // locoAction()
 
 //////////////////////////////////////////////////////////////
+//  CHECK HEATBEAT  //////////////////////////////////////////
+//////////////////////////////////////////////////////////////
 
 void checkHeartbeat(int i) {
   if(heartbeat[0+i*2] > 0 && heartbeat[0+i*2] + heartbeatTimeout * 1000 < millis()) {
@@ -634,6 +680,8 @@ void checkHeartbeat(int i) {
   }
 }  // checkHeartbeat()
 
+//////////////////////////////////////////////////////////////
+//  OUTPUT TOGGLE  ///////////////////////////////////////////
 //////////////////////////////////////////////////////////////
 
 void outputToggle(int aID, String aStatus){
